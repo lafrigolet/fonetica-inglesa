@@ -7,48 +7,54 @@
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --bg: #f8fafc;
+  --bg: #fef6f0;
+  --bg-grad: linear-gradient(135deg, #fef6f0 0%, #f3e8ff 50%, #ddf4ff 100%);
   --surface: #ffffff;
-  --surface-alt: #ffffff;
-  --border: #e2e8f0;
-  --text: #0f172a;
-  --text-muted: #64748b;
-  --accent: #6366f1;
-  --accent-hover: #4f46e5;
-  --success: #10b981;
+  --surface-alt: #fff8fb;
+  --border: #f3d9e8;
+  --text: #4c3a5e;
+  --text-muted: #9b85a8;
+  --accent: #b794f4;
+  --accent-hover: #9f7aea;
+  --success: #6ee7b7;
   --success-bg: #d1fae5;
   --success-text: #065f46;
-  --error: #ef4444;
-  --error-bg: #fee2e2;
-  --error-text: #991b1b;
-  --warning: #f59e0b;
+  --error: #fda4af;
+  --error-bg: #ffe4e6;
+  --error-text: #9f1239;
+  --warning: #fcd34d;
   --warning-bg: #fef3c7;
-  --warning-text: #78350f;
-  --shadow: rgba(0,0,0,0.06);
+  --warning-text: #854d0e;
+  --shadow: rgba(183,148,244,0.18);
+  --pulse-rgb: 253,164,175;
 }
 [data-theme="dark"] {
-  --bg: #0b1220;
-  --surface: #1e293b;
-  --surface-alt: #0f172a;
-  --border: #334155;
-  --text: #f1f5f9;
-  --text-muted: #94a3b8;
-  --accent: #818cf8;
-  --accent-hover: #a5b4fc;
-  --success: #10b981;
-  --success-bg: #064e3b;
+  --bg: #1a1428;
+  --bg-grad: linear-gradient(135deg, #1a1428 0%, #2a1f3d 50%, #1f2a3f 100%);
+  --surface: #2a2240;
+  --surface-alt: #332954;
+  --border: #443866;
+  --text: #f5e6f7;
+  --text-muted: #b8a5c9;
+  --accent: #c4a7e7;
+  --accent-hover: #d8b4fe;
+  --success: #6ee7b7;
+  --success-bg: #134e4a;
   --success-text: #a7f3d0;
-  --error: #ef4444;
-  --error-bg: #7f1d1d;
-  --error-text: #fecaca;
-  --warning: #f59e0b;
-  --warning-bg: #78350f;
+  --error: #fda4af;
+  --error-bg: #6f1d2e;
+  --error-text: #fecdd3;
+  --warning: #fcd34d;
+  --warning-bg: #713f12;
   --warning-text: #fde68a;
   --shadow: rgba(0,0,0,0.4);
+  --pulse-rgb: 253,164,175;
 }
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   background: var(--bg);
+  background-image: var(--bg-grad);
+  background-attachment: fixed;
   color: var(--text);
   min-height: 100vh;
   padding: 16px;
@@ -166,7 +172,12 @@ header p { color: var(--text-muted); font-size: 15px; }
 .word-text {
   font-size: 56px; font-weight: 700;
   letter-spacing: -1px; line-height: 1.1;
+  cursor: pointer; user-select: none;
+  display: inline-block;
+  transition: transform 0.15s, color 0.15s;
 }
+.word-text:hover { color: var(--accent); transform: scale(1.03); }
+.word-text:active { transform: scale(0.98); }
 .word-meaning {
   color: var(--text-muted); font-size: 15px;
   margin-top: 10px; font-style: italic;
@@ -194,11 +205,11 @@ header p { color: var(--text-muted); font-size: 15px; }
 .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 .btn.recording {
   background: var(--error); border-color: var(--error);
-  color: white; animation: pulse 1.5s infinite;
+  color: var(--error-text); animation: pulse 1.5s infinite;
 }
 @keyframes pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.45); }
-  50% { box-shadow: 0 0 0 12px rgba(239,68,68,0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--pulse-rgb),0.55); }
+  50% { box-shadow: 0 0 0 14px rgba(var(--pulse-rgb),0); }
 }
 
 .feedback {
@@ -784,6 +795,10 @@ function showFeedback(html, type) {
 document.getElementById('listen-btn').addEventListener('click', () => {
   speak(currentPhoneme.words[currentWordIdx].word, false);
 });
+document.getElementById('word-text').addEventListener('click', () => {
+  speak(currentPhoneme.words[currentWordIdx].word, false);
+});
+document.getElementById('word-text').setAttribute('title', 'Pulsa para oír');
 document.getElementById('listen-slow-btn').addEventListener('click', () => {
   speak(currentPhoneme.words[currentWordIdx].word, true);
 });
