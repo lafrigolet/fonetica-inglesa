@@ -160,8 +160,13 @@ header p { color: var(--text-muted); font-size: 15px; }
   padding: 36px 24px;
   margin-top: 20px;
   text-align: center;
-  transition: border-color 0.3s, background 0.3s;
+  cursor: pointer;
+  transition: border-color 0.3s, background 0.3s, transform 0.15s;
 }
+.word-card:hover:not(.success):not(.error):not(.listening) {
+  border-color: var(--accent);
+}
+.word-card:active { transform: scale(0.99); }
 .word-card.success { border-color: var(--success); background: var(--success-bg); }
 .word-card.error { border-color: var(--error); background: var(--error-bg); }
 .word-card.listening { border-color: var(--warning); background: var(--warning-bg); }
@@ -817,10 +822,10 @@ function showFeedback(html, type) {
 document.getElementById('listen-btn').addEventListener('click', () => {
   speak(currentPhoneme.words[currentWordIdx].word, false);
 });
-document.getElementById('word-text').addEventListener('click', () => {
+document.getElementById('word-card').addEventListener('click', () => {
   speak(currentPhoneme.words[currentWordIdx].word, false);
 });
-document.getElementById('word-text').setAttribute('title', 'Pulsa para oír');
+document.getElementById('word-card').setAttribute('title', 'Pulsa para oír');
 document.getElementById('listen-slow-btn').addEventListener('click', () => {
   speak(currentPhoneme.words[currentWordIdx].word, true);
 });
