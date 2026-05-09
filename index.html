@@ -161,6 +161,7 @@ header p { color: var(--text-muted); font-size: 15px; }
   margin-top: 20px;
   text-align: center;
   cursor: pointer;
+  touch-action: pan-y;
   transition: border-color 0.3s, background 0.3s, transform 0.15s;
 }
 .word-card:hover:not(.success):not(.error):not(.listening) {
@@ -822,10 +823,41 @@ function showFeedback(html, type) {
 document.getElementById('listen-btn').addEventListener('click', () => {
   speak(currentPhoneme.words[currentWordIdx].word, false);
 });
+let cardSwiped = false;
 document.getElementById('word-card').addEventListener('click', () => {
+  if (cardSwiped) { cardSwiped = false; return; }
   speak(currentPhoneme.words[currentWordIdx].word, false);
 });
-document.getElementById('word-card').setAttribute('title', 'Pulsa para oír');
+document.getElementById('word-card').setAttribute('title', 'Pulsa para oír · desliza para cambiar');
+(function setupCardSwipe() {
+  const card = document.getElementById('word-card');
+  let startX = null, startY = null;
+  card.addEventListener('pointerdown', (e) => {
+    startX = e.clientX;
+    startY = e.clientY;
+    cardSwiped = false;
+    try { card.setPointerCapture(e.pointerId); } catch {}
+  });
+  card.addEventListener('pointerup', (e) => {
+    if (startX === null) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    startX = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+      cardSwiped = true;
+      navigateWord(dx < 0 ? 1 : -1);
+    }
+  });
+  card.addEventListener('pointercancel', () => { startX = null; });
+})();
+function navigateWord(delta) {
+  if (!currentPhoneme) return;
+  if (isRecording && recognition) { try { recognition.abort(); } catch {} }
+  const newIdx = currentWordIdx + delta;
+  if (newIdx < 0 || newIdx >= currentPhoneme.words.length) return;
+  currentWordIdx = newIdx;
+  showCurrentWord(false);
+}
 document.getElementById('listen-slow-btn').addEventListener('click', () => {
   speak(currentPhoneme.words[currentWordIdx].word, true);
 });
