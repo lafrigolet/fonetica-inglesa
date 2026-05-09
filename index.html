@@ -715,6 +715,7 @@ function startRecording() {
   recognition.onerror = (event) => {
     if (event.error === 'no-speech') {
       showFeedback('No te he oído. Inténtalo otra vez.', 'info');
+      setTimeout(() => speak(currentPhoneme.words[currentWordIdx].word, false), 700);
     } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
       showFeedback('Necesito permiso para usar el micrófono.', 'error');
     } else if (event.error !== 'aborted') {
