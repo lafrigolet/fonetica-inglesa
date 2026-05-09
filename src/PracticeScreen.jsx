@@ -25,7 +25,6 @@ export default function PracticeScreen({
   const mediaRecorderRef = useRef(null);
   const recordedChunksRef = useRef([]);
   const lastRecordingURLRef = useRef(null);
-  const mediaStartTimeoutRef = useRef(null);
 
   // Reset on phoneme change
   useEffect(() => {
@@ -50,10 +49,6 @@ export default function PracticeScreen({
 
   // Cleanup on unmount
   useEffect(() => () => {
-    if (mediaStartTimeoutRef.current) {
-      clearTimeout(mediaStartTimeoutRef.current);
-      mediaStartTimeoutRef.current = null;
-    }
     if (recognitionRef.current) {
       try { recognitionRef.current.abort(); } catch {}
     }
@@ -99,7 +94,7 @@ export default function PracticeScreen({
         const blob = new Blob(recordedChunksRef.current, { type: mr.mimeType || 'audio/webm' });
         lastRecordingURLRef.current = URL.createObjectURL(blob);
       };
-      mr.start();
+      mr.start(100);
       mediaRecorderRef.current = mr;
     } catch {
       mediaRecorderRef.current = null;
@@ -110,10 +105,6 @@ export default function PracticeScreen({
     const mr = mediaRecorderRef.current;
     if (mr && mr.state === 'recording') {
       try { mr.stop(); } catch {}
-    }
-    if (mediaStartTimeoutRef.current) {
-      clearTimeout(mediaStartTimeoutRef.current);
-      mediaStartTimeoutRef.current = null;
     }
   }
 
@@ -272,10 +263,7 @@ export default function PracticeScreen({
     recognitionRef.current = rec;
     try {
       rec.start();
-      mediaStartTimeoutRef.current = setTimeout(() => {
-        mediaStartTimeoutRef.current = null;
-        if (recognitionRef.current) startMediaRecording();
-      }, 250);
+      startMediaRecording();
     } catch {
       setIsRecording(false);
       setCardState('');
