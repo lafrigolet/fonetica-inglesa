@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { speak, SpeechRecognitionAPI } from './speech';
 import { isMatch, escapeHTML } from './utils';
-import { PHONEME_SOUND } from './phonemes';
 
 export default function PracticeScreen({
   phoneme,
@@ -27,15 +26,6 @@ export default function PracticeScreen({
   useEffect(() => {
     setWordIdx(initialIdx);
   }, [phoneme.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Play phoneme sound on entry
-  useEffect(() => {
-    const sound = PHONEME_SOUND[phoneme.id];
-    if (!sound) return;
-    const t = setTimeout(() => speak(sound, true, voiceLang), 350);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phoneme.id]);
 
   // Reset per-word state when wordIdx changes; track direction for animation
   useEffect(() => {
