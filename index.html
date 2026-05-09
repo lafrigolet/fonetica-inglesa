@@ -9,6 +9,7 @@
 :root {
   --bg: #f8fafc;
   --surface: #ffffff;
+  --surface-alt: #ffffff;
   --border: #e2e8f0;
   --text: #0f172a;
   --text-muted: #64748b;
@@ -23,6 +24,27 @@
   --warning: #f59e0b;
   --warning-bg: #fef3c7;
   --warning-text: #78350f;
+  --shadow: rgba(0,0,0,0.06);
+}
+[data-theme="dark"] {
+  --bg: #0b1220;
+  --surface: #1e293b;
+  --surface-alt: #0f172a;
+  --border: #334155;
+  --text: #f1f5f9;
+  --text-muted: #94a3b8;
+  --accent: #818cf8;
+  --accent-hover: #a5b4fc;
+  --success: #10b981;
+  --success-bg: #064e3b;
+  --success-text: #a7f3d0;
+  --error: #ef4444;
+  --error-bg: #7f1d1d;
+  --error-text: #fecaca;
+  --warning: #f59e0b;
+  --warning-bg: #78350f;
+  --warning-text: #fde68a;
+  --shadow: rgba(0,0,0,0.4);
 }
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
@@ -32,6 +54,7 @@ body {
   padding: 16px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  transition: background 0.2s, color 0.2s;
 }
 .container { max-width: 720px; margin: 0 auto; }
 header { text-align: center; padding: 24px 16px 16px; }
@@ -46,14 +69,16 @@ header p { color: var(--text-muted); font-size: 15px; }
 .settings select {
   font-family: inherit; font-size: 13px;
   padding: 5px 8px; border-radius: 6px;
-  border: 1px solid var(--border); background: white;
+  border: 1px solid var(--border);
+  background: var(--surface); color: var(--text);
 }
 .settings .icon-btn {
   background: none; border: 1px solid var(--border);
   padding: 5px 10px; border-radius: 6px; font-size: 13px;
   color: var(--text-muted); cursor: pointer; font-family: inherit;
+  display: inline-flex; align-items: center; gap: 6px;
 }
-.settings .icon-btn:hover { background: white; color: var(--text); }
+.settings .icon-btn:hover { background: var(--surface); color: var(--text); }
 
 .phoneme-grid {
   display: grid;
@@ -75,7 +100,7 @@ header p { color: var(--text-muted); font-size: 15px; }
 .phoneme-card:hover {
   border-color: var(--accent);
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+  box-shadow: 0 6px 16px var(--shadow);
 }
 .phoneme-card.complete { border-color: var(--success); }
 .phoneme-symbol {
@@ -184,7 +209,7 @@ header p { color: var(--text-muted); font-size: 15px; }
 .feedback.show { display: block; }
 .feedback.success { background: var(--success-bg); color: var(--success-text); }
 .feedback.error { background: var(--error-bg); color: var(--error-text); }
-.feedback.info { background: white; color: var(--text-muted); border: 1px solid var(--border); }
+.feedback.info { background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); }
 .heard-text {
   font-family: "Charis SIL", Georgia, serif;
   font-style: italic; font-weight: 600;
@@ -249,6 +274,10 @@ header p { color: var(--text-muted); font-size: 15px; }
         <option value="en-US">Americana (en-US)</option>
       </select>
     </label>
+    <button class="icon-btn" id="theme-btn" aria-label="Cambiar tema">
+      <span id="theme-icon">🌙</span>
+      <span id="theme-label">Modo oscuro</span>
+    </button>
     <button class="icon-btn" id="reset-btn">Reiniciar progreso</button>
   </div>
   <div class="phoneme-grid" id="phoneme-grid"></div>
@@ -493,6 +522,28 @@ let attempts = 0;
 let isRecording = false;
 let recognition = null;
 
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const icon = document.getElementById('theme-icon');
+  const label = document.getElementById('theme-label');
+  if (icon && label) {
+    icon.textContent = theme === 'dark' ? '☀️' : '🌙';
+    label.textContent = theme === 'dark' ? 'Modo claro' : 'Modo oscuro';
+  }
+}
+function loadTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem('phon-theme'); } catch {}
+  if (saved === 'dark' || saved === 'light') return saved;
+  return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  applyTheme(next);
+  try { localStorage.setItem('phon-theme', next); } catch {}
+}
+
 const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
 const SpeechSynthesisAPI = window.speechSynthesis;
 
@@ -714,6 +765,7 @@ function evaluatePronunciation(alternatives) {
       msg += '<br><small style="opacity:0.8">Pulsa "Despacio" para oírla de nuevo y fíjate en la posición de la boca.</small>';
     }
     showFeedback(msg, 'error');
+    setTimeout(() => speak(target, attempts >= 3), 700);
   }
 }
 
@@ -761,6 +813,7 @@ document.getElementById('done-btn').addEventListener('click', () => {
   document.getElementById('screen-home').style.display = 'block';
   renderHome();
 });
+document.getElementById('theme-btn').addEventListener('click', toggleTheme);
 document.getElementById('reset-btn').addEventListener('click', () => {
   if (confirm('¿Reiniciar todo el progreso?')) {
     try { localStorage.removeItem('phon-progress'); } catch {}
@@ -768,6 +821,7 @@ document.getElementById('reset-btn').addEventListener('click', () => {
   }
 });
 
+applyTheme(loadTheme());
 checkSupport();
 renderHome();
 if (SpeechSynthesisAPI) {
