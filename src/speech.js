@@ -9,8 +9,11 @@ if (SpeechSynthesisAPI) {
   SpeechSynthesisAPI.onvoiceschanged = () => SpeechSynthesisAPI.getVoices();
 }
 
-export function speak(text, slow, lang = 'en-GB') {
-  if (!SpeechSynthesisAPI) return;
+export function speak(text, slow, lang = 'en-GB', onDone) {
+  if (!SpeechSynthesisAPI) {
+    if (onDone) onDone();
+    return;
+  }
   SpeechSynthesisAPI.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = lang;
@@ -20,6 +23,12 @@ export function speak(text, slow, lang = 'en-GB') {
   const voice = voices.find((v) => v.lang === lang)
              || voices.find((v) => v.lang.startsWith(lang.split('-')[0]));
   if (voice) utterance.voice = voice;
+  if (onDone) {
+    let called = false;
+    const fire = () => { if (!called) { called = true; onDone(); } };
+    utterance.onend = fire;
+    utterance.onerror = fire;
+  }
   SpeechSynthesisAPI.speak(utterance);
 }
 

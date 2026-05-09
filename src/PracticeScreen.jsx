@@ -187,15 +187,10 @@ export default function PracticeScreen({
     setAttempts(newAttempts);
 
     if (matched) {
-      setCardState('success');
       setFeedback({
-        html: `¡Correcto! Has dicho <span class="heard-text">${escapeHTML(alternatives[0])}</span>`,
-        type: 'success',
+        html: `Has dicho <span class="heard-text">${escapeHTML(alternatives[0])}</span>`,
+        type: 'info',
       });
-      onMarkWordDone(phoneme.id, wordIdx);
-      setTimeout(() => {
-        setWordIdx((i) => i + 1);
-      }, 1200);
     } else {
       setCardState('error');
       setTimeout(() => setCardState((s) => (s === 'error' ? '' : s)), 1500);
@@ -204,12 +199,27 @@ export default function PracticeScreen({
         html += '<br><small style="opacity:0.8">Pulsa "Despacio" para oírla de nuevo y fíjate en la posición de la boca.</small>';
       }
       setFeedback({ html, type: 'error' });
-      setTimeout(() => {
-        playRecording(() => {
-          setTimeout(() => speak(target, newAttempts >= 3, voiceLang), 250);
-        });
-      }, 700);
     }
+
+    setTimeout(() => {
+      playRecording(() => {
+        setTimeout(() => {
+          if (matched) {
+            speak(target, false, voiceLang, () => {
+              setCardState('success');
+              setFeedback({
+                html: `¡Correcto! Has dicho <span class="heard-text">${escapeHTML(alternatives[0])}</span>`,
+                type: 'success',
+              });
+              onMarkWordDone(phoneme.id, wordIdx);
+              setTimeout(() => setWordIdx((i) => i + 1), 1000);
+            });
+          } else {
+            speak(target, newAttempts >= 3, voiceLang);
+          }
+        }, 250);
+      });
+    }, 700);
   }
 
   function startRecording() {
