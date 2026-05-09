@@ -229,6 +229,9 @@ export default function PracticeScreen({
     setCardState('listening');
     setFeedback(null);
 
+    rec.onspeechend = () => { stopMediaRecording(); };
+    rec.onaudioend = () => { stopMediaRecording(); };
+
     rec.onresult = (event) => {
       stopMediaRecording();
       const results = event.results[0];
