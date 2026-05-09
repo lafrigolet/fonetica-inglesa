@@ -35,7 +35,14 @@ export default function HomeScreen({
   return (
     <div>
       <header>
-        <h1>Fonética inglesa</h1>
+        <img
+          src={`${import.meta.env.BASE_URL}logo.svg`}
+          alt="Ship o Sheep"
+          width="84"
+          height="84"
+          className="app-logo"
+        />
+        <h1>Ship o Sheep</h1>
         <p>Practica los sonidos del inglés que no existen en español</p>
       </header>
 
