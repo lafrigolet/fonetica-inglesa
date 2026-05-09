@@ -527,6 +527,25 @@ const PHONEMES = [
     ]},
 ];
 
+const PHONEME_SOUND = {
+  ae:    'aaa',
+  ih:    'ih',
+  iy:    'eee',
+  uh:    'oo',
+  uw:    'oooo',
+  ah:    'uh',
+  er:    'urrr',
+  schwa: 'uh',
+  v:     'vvv',
+  z:     'zzz',
+  sh:    'shhh',
+  zh:    'zhuh',
+  j:     'juh',
+  h:     'huh',
+  ng:    'nnng',
+  w:     'wah',
+};
+
 let currentPhoneme = null;
 let currentWordIdx = 0;
 let attempts = 0;
@@ -620,7 +639,9 @@ function startPractice(phoneme) {
   document.getElementById('screen-practice').style.display = 'block';
   document.getElementById('practice-symbol').textContent = phoneme.symbol + ' ' + phoneme.name;
   document.getElementById('practice-description').textContent = phoneme.description;
-  showCurrentWord(true);
+  showCurrentWord(false);
+  const sound = PHONEME_SOUND[phoneme.id];
+  if (sound) setTimeout(() => speak(sound, true), 350);
 }
 
 function showCurrentWord(autoPlay) {
