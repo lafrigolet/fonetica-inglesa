@@ -609,10 +609,10 @@ function startPractice(phoneme) {
   document.getElementById('screen-practice').style.display = 'block';
   document.getElementById('practice-symbol').textContent = phoneme.symbol + ' ' + phoneme.name;
   document.getElementById('practice-description').textContent = phoneme.description;
-  showCurrentWord();
+  showCurrentWord(true);
 }
 
-function showCurrentWord() {
+function showCurrentWord(autoPlay) {
   if (currentWordIdx >= currentPhoneme.words.length) {
     showCompletion();
     return;
@@ -625,7 +625,9 @@ function showCurrentWord() {
   document.getElementById('word-card').className = 'word-card';
   document.getElementById('feedback').className = 'feedback';
   attempts = 0;
-  setTimeout(() => speak(word.word, false), 350);
+  if (autoPlay) {
+    setTimeout(() => speak(word.word, false), 350);
+  }
 }
 
 function showCompletion() {
