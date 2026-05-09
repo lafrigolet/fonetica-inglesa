@@ -16,10 +16,12 @@ export default function PracticeScreen({
   const [isRecording, setIsRecording] = useState(false);
   const [feedback, setFeedback] = useState(null); // { html, type }
   const [cardState, setCardState] = useState(''); // '', 'success', 'error', 'listening'
+  const [direction, setDirection] = useState('forward');
 
   const recognitionRef = useRef(null);
   const cardRef = useRef(null);
   const swipedRef = useRef(false);
+  const prevIdxRef = useRef(initialIdx);
 
   // Reset on phoneme change
   useEffect(() => {
@@ -35,8 +37,11 @@ export default function PracticeScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phoneme.id]);
 
-  // Reset per-word state when wordIdx changes
+  // Reset per-word state when wordIdx changes; track direction for animation
   useEffect(() => {
+    if (wordIdx > prevIdxRef.current) setDirection('forward');
+    else if (wordIdx < prevIdxRef.current) setDirection('backward');
+    prevIdxRef.current = wordIdx;
     setAttempts(0);
     setFeedback(null);
     setCardState('');
@@ -220,6 +225,7 @@ export default function PracticeScreen({
 
   const cardClass = ['word-card', cardState].filter(Boolean).join(' ');
   const fbClass = feedback ? `feedback show ${feedback.type}` : 'feedback';
+  const slideClass = direction === 'backward' ? 'animate-slide-in-left' : 'animate-slide-in-right';
 
   return (
     <div>
@@ -238,9 +244,11 @@ export default function PracticeScreen({
         title="Pulsa para oír · desliza para cambiar"
         onClick={handleCardClick}
       >
-        <div className="word-ipa">{word.ipa}</div>
-        <div className="word-text">{word.word}</div>
-        <div className="word-meaning">{word.meaning}</div>
+        <div key={wordIdx} className={slideClass}>
+          <div className="word-ipa">{word.ipa}</div>
+          <div className="word-text">{word.word}</div>
+          <div className="word-meaning">{word.meaning}</div>
+        </div>
       </div>
 
       <div className="controls">
