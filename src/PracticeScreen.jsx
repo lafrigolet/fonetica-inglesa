@@ -25,6 +25,7 @@ export default function PracticeScreen({
   const mediaRecorderRef = useRef(null);
   const recordedChunksRef = useRef([]);
   const lastRecordingURLRef = useRef(null);
+  const activeAudioRef = useRef(null);
 
   // Reset on phoneme change
   useEffect(() => {
@@ -75,6 +76,10 @@ export default function PracticeScreen({
 
   // Cleanup on unmount
   useEffect(() => () => {
+    if (activeAudioRef.current) {
+      try { activeAudioRef.current.pause(); activeAudioRef.current.src = ''; } catch {}
+      activeAudioRef.current = null;
+    }
     if (recognitionRef.current) {
       try { recognitionRef.current.abort(); } catch {}
     }
@@ -116,12 +121,27 @@ export default function PracticeScreen({
     }
   }
 
+  function stopPlayback() {
+    const a = activeAudioRef.current;
+    if (a) {
+      try { a.pause(); a.src = ''; } catch {}
+      activeAudioRef.current = null;
+    }
+  }
+
   function playRecording(onDone) {
     const url = lastRecordingURLRef.current;
     if (!url) { onDone(); return; }
+    stopPlayback();
     const audio = new Audio(url);
+    activeAudioRef.current = audio;
     let called = false;
-    const fire = () => { if (!called) { called = true; onDone(); } };
+    const fire = () => {
+      if (called) return;
+      called = true;
+      if (activeAudioRef.current === audio) activeAudioRef.current = null;
+      onDone();
+    };
     audio.onended = fire;
     audio.onerror = fire;
     audio.play().catch(fire);
@@ -226,11 +246,15 @@ export default function PracticeScreen({
     setCardState('listening');
     setFeedback(null);
 
-    rec.onspeechend = () => { stopMediaRecording(); };
-    rec.onaudioend = () => { stopMediaRecording(); };
+    rec.onstart = () => { stopPlayback(); };
+    rec.onaudiostart = () => { stopPlayback(); };
+    rec.onspeechstart = () => { stopPlayback(); };
+    rec.onspeechend = () => { stopMediaRecording(); stopPlayback(); };
+    rec.onaudioend = () => { stopMediaRecording(); stopPlayback(); };
 
     rec.onresult = (event) => {
       stopMediaRecording();
+      stopPlayback();
       const results = event.results[0];
       const alts = [];
       for (let i = 0; i < results.length; i++) alts.push(results[i].transcript);
@@ -239,6 +263,7 @@ export default function PracticeScreen({
 
     rec.onerror = (event) => {
       stopMediaRecording();
+      stopPlayback();
       if (event.error === 'no-speech') {
         setFeedback({ html: 'No te he oído. Inténtalo otra vez.', type: 'info' });
         setTimeout(() => speak(word.word, false, voiceLang), 700);
@@ -255,6 +280,8 @@ export default function PracticeScreen({
       recognitionRef.current = null;
       stopMediaRecording();
     };
+
+    stopPlayback();
 
     recognitionRef.current = rec;
     try {
