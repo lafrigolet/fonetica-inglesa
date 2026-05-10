@@ -15,10 +15,20 @@ export default {
           '0%': { transform: 'translateX(-40%)', opacity: '0' },
           '100%': { transform: 'translateX(0)', opacity: '1' },
         },
+        'slot-up': {
+          '0%':   { transform: 'translateY(40%)', opacity: '0' },
+          '100%': { transform: 'translateY(0)',   opacity: '1' },
+        },
+        'slot-down': {
+          '0%':   { transform: 'translateY(-40%)', opacity: '0' },
+          '100%': { transform: 'translateY(0)',    opacity: '1' },
+        },
       },
       animation: {
         'slide-in-right': 'slide-in-right 0.35s cubic-bezier(0.22, 1, 0.36, 1)',
         'slide-in-left': 'slide-in-left 0.35s cubic-bezier(0.22, 1, 0.36, 1)',
+        'slot-up':   'slot-up 0.45s cubic-bezier(0.22, 1, 0.36, 1)',
+        'slot-down': 'slot-down 0.45s cubic-bezier(0.22, 1, 0.36, 1)',
       },
     },
   },

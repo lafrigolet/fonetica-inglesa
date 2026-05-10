@@ -11,6 +11,8 @@ export default function PracticeScreen({
   onComplete,
 }) {
   const TARGET_REPETITIONS = 10;
+  const SLOT_HEIGHT = 240;
+  const SLOT_HEIGHT_MOBILE = 200;
 
   const [wordIdx, setWordIdx] = useState(initialIdx);
   const [attempts, setAttempts] = useState(0);
@@ -19,9 +21,12 @@ export default function PracticeScreen({
   const [feedback, setFeedback] = useState(null); // { html, type }
   const [cardState, setCardState] = useState(''); // '' (blue), 'recording' (red), 'success' (green)
   const [direction, setDirection] = useState('forward');
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
 
   const recognitionRef = useRef(null);
   const cardRef = useRef(null);
+  const carouselRef = useRef(null);
   const swipedRef = useRef(false);
   const prevIdxRef = useRef(initialIdx);
   const mediaStreamRef = useRef(null);
@@ -232,40 +237,77 @@ export default function PracticeScreen({
     }
   }
 
-  // Swipe handling
+  // Carousel drag handling — finger follows the track, snaps on release
   useEffect(() => {
-    const card = cardRef.current;
-    if (!card) return;
+    const carousel = carouselRef.current;
+    if (!carousel) return;
     let startX = null, startY = null;
+    let dragging = false;
+
+    const slotHeight = window.matchMedia('(max-width: 480px)').matches
+      ? SLOT_HEIGHT_MOBILE
+      : SLOT_HEIGHT;
 
     const onDown = (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
       startX = e.clientX;
       startY = e.clientY;
       swipedRef.current = false;
-      try { card.setPointerCapture(e.pointerId); } catch {}
+      dragging = false;
+      try { carousel.setPointerCapture(e.pointerId); } catch {}
     };
-    const onUp = (e) => {
-      if (startX === null) return;
-      const dx = e.clientX - startX;
+    const onMove = (e) => {
+      if (startY === null) return;
       const dy = e.clientY - startY;
-      startX = null;
-      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
-        swipedRef.current = true;
-        navigateWord(dx < 0 ? 1 : -1);
+      const dx = e.clientX - startX;
+      if (!dragging && Math.abs(dy) > 6 && Math.abs(dy) > Math.abs(dx)) {
+        dragging = true;
+        setIsDragging(true);
+      }
+      if (dragging) {
+        let limited = dy;
+        if (wordIdx === 0 && dy > 0) limited = dy * 0.35;
+        if (wordIdx === phoneme.words.length - 1 && dy < 0) limited = dy * 0.35;
+        setDragOffset(limited);
       }
     };
-    const onCancel = () => { startX = null; };
+    const onUp = (e) => {
+      if (startY === null) return;
+      const dy = e.clientY - startY;
+      const dx = e.clientX - startX;
+      startX = null;
+      startY = null;
+      if (dragging) {
+        dragging = false;
+        setIsDragging(false);
+        setDragOffset(0);
+        if (Math.abs(dy) > slotHeight / 4 && Math.abs(dy) > Math.abs(dx)) {
+          swipedRef.current = true;
+          navigateWord(dy < 0 ? 1 : -1);
+        }
+      }
+    };
+    const onCancel = () => {
+      startX = null; startY = null;
+      if (dragging) {
+        dragging = false;
+        setIsDragging(false);
+        setDragOffset(0);
+      }
+    };
 
-    card.addEventListener('pointerdown', onDown);
-    card.addEventListener('pointerup', onUp);
-    card.addEventListener('pointercancel', onCancel);
+    carousel.addEventListener('pointerdown', onDown);
+    carousel.addEventListener('pointermove', onMove);
+    carousel.addEventListener('pointerup', onUp);
+    carousel.addEventListener('pointercancel', onCancel);
     return () => {
-      card.removeEventListener('pointerdown', onDown);
-      card.removeEventListener('pointerup', onUp);
-      card.removeEventListener('pointercancel', onCancel);
+      carousel.removeEventListener('pointerdown', onDown);
+      carousel.removeEventListener('pointermove', onMove);
+      carousel.removeEventListener('pointerup', onUp);
+      carousel.removeEventListener('pointercancel', onCancel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wordIdx, isRecording, phoneme.id]);
+  }, [wordIdx, isRecording, phoneme.id, phoneme.words.length]);
 
   function navigateWord(delta) {
     if (recognitionRef.current && isRecording) {
@@ -276,6 +318,14 @@ export default function PracticeScreen({
       if (next < 0 || next >= phoneme.words.length) return idx;
       return next;
     });
+  }
+
+  function goToWord(target) {
+    if (target === wordIdx || target < 0 || target >= phoneme.words.length) return;
+    if (recognitionRef.current && isRecording) {
+      try { recognitionRef.current.abort(); } catch {}
+    }
+    setWordIdx(target);
   }
 
   const word = phoneme.words[wordIdx];
@@ -423,7 +473,11 @@ export default function PracticeScreen({
 
   const buttonClass = ['record-button', cardState].filter(Boolean).join(' ');
   const fbClass = feedback ? `feedback show ${feedback.type}` : 'feedback';
-  const slideClass = direction === 'backward' ? 'animate-slide-in-left' : 'animate-slide-in-right';
+
+  const words = phoneme.words;
+  const slotPx = typeof window !== 'undefined' && window.matchMedia('(max-width: 480px)').matches
+    ? SLOT_HEIGHT_MOBILE : SLOT_HEIGHT;
+  const trackOffset = -slotPx / 2 - wordIdx * slotPx + dragOffset;
 
   return (
     <div>
@@ -433,30 +487,53 @@ export default function PracticeScreen({
           <h2>{phoneme.symbol} {phoneme.name}</h2>
           <p>{phoneme.description}</p>
         </div>
-        <div className="practice-progress">{wordIdx + 1} / {phoneme.words.length}</div>
+        <div className="practice-progress">{wordIdx + 1} / {words.length}</div>
       </div>
 
       <div className={fbClass} dangerouslySetInnerHTML={feedback ? { __html: feedback.html } : undefined} />
 
-      <button
-        ref={cardRef}
-        type="button"
-        className={buttonClass}
-        title="Pulsa para oír y luego grabarte · desliza para cambiar"
-        onClick={handleCardClick}
-      >
-        <span key={wordIdx} className={`record-button-label ${slideClass}`}>{word.word}</span>
-        <span className="record-button-counter">
-          <span key={successCount} className="record-button-counter-num">
-            {Math.max(0, TARGET_REPETITIONS - successCount)}
-          </span>
-        </span>
-      </button>
-
-      <div className="word-meta" key={`meta-${wordIdx}`}>
-        <div className="word-ipa">{word.ipa}</div>
-        <div className="word-meaning">{word.meaning}</div>
+      <div className="word-carousel" ref={carouselRef}>
+        <div
+          className={`carousel-track${isDragging ? '' : ' snapping'}`}
+          style={{ transform: `translateY(${trackOffset}px)` }}
+        >
+          {words.map((w, i) => {
+            const isCenter = i === wordIdx;
+            return (
+              <div className="carousel-slot" key={i}>
+                <button
+                  type="button"
+                  ref={isCenter ? cardRef : undefined}
+                  className={isCenter ? buttonClass : 'record-button inactive'}
+                  onClick={() => {
+                    if (swipedRef.current) { swipedRef.current = false; return; }
+                    if (isCenter) handleCardClick();
+                    else goToWord(i);
+                  }}
+                  title={isCenter ? 'Pulsa para oír y luego grabarte' : `Ir a "${w.word}"`}
+                  tabIndex={Math.abs(i - wordIdx) <= 1 ? 0 : -1}
+                  aria-hidden={Math.abs(i - wordIdx) > 1}
+                >
+                  <div className="word-meta" key={`meta-${wordIdx}`}>
+                    <div className="word-ipa">{word.ipa}</div>
+                    <div className="word-meaning">{word.meaning}</div>
+                  </div>
+                  
+                  <span className="record-button-label">{w.word}</span>
+                  {isCenter && (
+                    <span className="record-button-counter">
+                      <span key={successCount} className="record-button-counter-num">
+                        {Math.max(0, TARGET_REPETITIONS - successCount)}
+                      </span>
+                    </span>
+                  )}
+                </button>
+              </div>
+            );
+          })}
+        </div>
       </div>
+
 
     </div>
   );

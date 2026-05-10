@@ -157,6 +157,38 @@ header p { color: var(--text-muted); font-size: 15px; }
   text-align: right; flex-shrink: 0;
 }
 
+.word-carousel {
+  position: relative;
+  height: 540px;
+  margin: 16px 0 8px;
+  overflow: hidden;
+  touch-action: pan-x;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 25%, black 75%, transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent 0%, black 25%, black 75%, transparent 100%);
+}
+.carousel-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  will-change: transform;
+}
+.carousel-track.snapping {
+  transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.carousel-slot {
+  flex-shrink: 0;
+  height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .record-button {
   display: flex;
   flex-direction: column;
@@ -164,16 +196,22 @@ header p { color: var(--text-muted); font-size: 15px; }
   justify-content: center;
   width: 220px;
   height: 220px;
-  margin: 40px auto 20px;
   border: none;
   border-radius: 50%;
   background: #60a5fa;
   color: white;
   cursor: pointer;
   font-family: inherit;
-  touch-action: pan-y;
-  transition: background 0.3s, transform 0.15s, box-shadow 0.3s;
+  transition: background 0.3s, transform 0.15s, box-shadow 0.3s, opacity 0.3s;
   box-shadow: 0 10px 30px rgba(96, 165, 250, 0.4);
+}
+.record-button.inactive {
+  background: #93c2f8;
+  opacity: 0.55;
+  box-shadow: 0 6px 18px rgba(96, 165, 250, 0.25);
+}
+.record-button.inactive:hover {
+  opacity: 0.75;
 }
 .record-button:hover { transform: scale(1.02); }
 .record-button:active { transform: scale(0.97); }
@@ -308,8 +346,10 @@ header p { color: var(--text-muted); font-size: 15px; }
 }
 
 @media (max-width: 480px) {
-  .record-button { width: 180px; height: 180px; margin-top: 28px; }
+  .record-button { width: 180px; height: 180px; }
   .record-button-label { font-size: 32px; }
+  .word-carousel { height: 460px; }
+  .carousel-slot { height: 200px; }
   .controls .btn { padding: 11px 14px; font-size: 13px; }
   .controls .btn.primary { padding: 12px 18px; font-size: 14px; }
   header h1 { font-size: 24px; }
