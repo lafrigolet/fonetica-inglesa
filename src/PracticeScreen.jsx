@@ -21,10 +21,6 @@ export default function PracticeScreen({
   const cardRef = useRef(null);
   const swipedRef = useRef(false);
   const prevIdxRef = useRef(initialIdx);
-  const mediaStreamRef = useRef(null);
-  const mediaRecorderRef = useRef(null);
-  const recordedChunksRef = useRef([]);
-  const lastRecordingURLRef = useRef(null);
 
   // Reset on phoneme change
   useEffect(() => {
@@ -52,72 +48,7 @@ export default function PracticeScreen({
     if (recognitionRef.current) {
       try { recognitionRef.current.abort(); } catch {}
     }
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      try { mediaRecorderRef.current.stop(); } catch {}
-    }
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach((t) => t.stop());
-      mediaStreamRef.current = null;
-    }
-    if (lastRecordingURLRef.current) {
-      URL.revokeObjectURL(lastRecordingURLRef.current);
-      lastRecordingURLRef.current = null;
-    }
   }, []);
-
-  async function ensureMediaStream() {
-    if (mediaStreamRef.current) return mediaStreamRef.current;
-    if (typeof navigator === 'undefined' || !navigator.mediaDevices || typeof window.MediaRecorder === 'undefined') return null;
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      });
-      mediaStreamRef.current = stream;
-      return stream;
-    } catch {
-      return null;
-    }
-  }
-
-  async function startMediaRecording() {
-    const stream = await ensureMediaStream();
-    if (!stream) return;
-    try {
-      recordedChunksRef.current = [];
-      const mr = new MediaRecorder(stream);
-      mr.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) recordedChunksRef.current.push(e.data);
-      };
-      mr.onstop = () => {
-        if (recordedChunksRef.current.length === 0) return;
-        if (lastRecordingURLRef.current) URL.revokeObjectURL(lastRecordingURLRef.current);
-        const blob = new Blob(recordedChunksRef.current, { type: mr.mimeType || 'audio/webm' });
-        lastRecordingURLRef.current = URL.createObjectURL(blob);
-      };
-      mr.start(100);
-      mediaRecorderRef.current = mr;
-    } catch {
-      mediaRecorderRef.current = null;
-    }
-  }
-
-  function stopMediaRecording() {
-    const mr = mediaRecorderRef.current;
-    if (mr && mr.state === 'recording') {
-      try { mr.stop(); } catch {}
-    }
-  }
-
-  function playRecording(onDone) {
-    const url = lastRecordingURLRef.current;
-    if (!url) { onDone(); return; }
-    const audio = new Audio(url);
-    let called = false;
-    const fire = () => { if (!called) { called = true; onDone(); } };
-    audio.onended = fire;
-    audio.onerror = fire;
-    audio.play().catch(fire);
-  }
 
   // Swipe handling
   useEffect(() => {
@@ -178,10 +109,13 @@ export default function PracticeScreen({
     setAttempts(newAttempts);
 
     if (matched) {
+      setCardState('success');
       setFeedback({
-        html: `Has dicho <span class="heard-text">${escapeHTML(alternatives[0])}</span>`,
-        type: 'info',
+        html: `¡Correcto! Has dicho <span class="heard-text">${escapeHTML(alternatives[0])}</span>`,
+        type: 'success',
       });
+      onMarkWordDone(phoneme.id, wordIdx);
+      setTimeout(() => setWordIdx((i) => i + 1), 1200);
     } else {
       setCardState('error');
       setTimeout(() => setCardState((s) => (s === 'error' ? '' : s)), 1500);
@@ -190,27 +124,8 @@ export default function PracticeScreen({
         html += '<br><small style="opacity:0.8">Pulsa "Despacio" para oírla de nuevo y fíjate en la posición de la boca.</small>';
       }
       setFeedback({ html, type: 'error' });
+      setTimeout(() => speak(target, newAttempts >= 3, voiceLang), 700);
     }
-
-    setTimeout(() => {
-      playRecording(() => {
-        setTimeout(() => {
-          if (matched) {
-            speak(target, false, voiceLang, () => {
-              setCardState('success');
-              setFeedback({
-                html: `¡Correcto! Has dicho <span class="heard-text">${escapeHTML(alternatives[0])}</span>`,
-                type: 'success',
-              });
-              onMarkWordDone(phoneme.id, wordIdx);
-              setTimeout(() => setWordIdx((i) => i + 1), 1000);
-            });
-          } else {
-            speak(target, newAttempts >= 3, voiceLang);
-          }
-        }, 250);
-      });
-    }, 700);
   }
 
   function startRecording() {
@@ -230,11 +145,7 @@ export default function PracticeScreen({
     setCardState('listening');
     setFeedback(null);
 
-    rec.onspeechend = () => { stopMediaRecording(); };
-    rec.onaudioend = () => { stopMediaRecording(); };
-
     rec.onresult = (event) => {
-      stopMediaRecording();
       const results = event.results[0];
       const alts = [];
       for (let i = 0; i < results.length; i++) alts.push(results[i].transcript);
@@ -242,7 +153,6 @@ export default function PracticeScreen({
     };
 
     rec.onerror = (event) => {
-      stopMediaRecording();
       if (event.error === 'no-speech') {
         setFeedback({ html: 'No te he oído. Inténtalo otra vez.', type: 'info' });
         setTimeout(() => speak(word.word, false, voiceLang), 700);
@@ -257,13 +167,11 @@ export default function PracticeScreen({
       setIsRecording(false);
       setCardState((s) => (s === 'listening' ? '' : s));
       recognitionRef.current = null;
-      stopMediaRecording();
     };
 
     recognitionRef.current = rec;
     try {
       rec.start();
-      startMediaRecording();
     } catch {
       setIsRecording(false);
       setCardState('');
