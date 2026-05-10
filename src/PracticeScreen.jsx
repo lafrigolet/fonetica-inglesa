@@ -276,6 +276,7 @@ export default function PracticeScreen({
   function evaluatePronunciation(alternatives) {
     if (!word) return;
     const target = word.word;
+    console.log('[Ship o Sheep] reconocido:', alternatives, '· objetivo:', target);
     let matched = false;
     for (const alt of alternatives) {
       if (isMatch(target, alt)) { matched = true; break; }
@@ -290,21 +291,24 @@ export default function PracticeScreen({
         type: 'success',
       });
       onMarkWordDone(phoneme.id, wordIdx);
-      setTimeout(() => setWordIdx((i) => i + 1), 1200);
     } else {
       setCardState('error');
       setTimeout(() => setCardState((s) => (s === 'error' ? '' : s)), 1500);
+      const uniqueAlts = Array.from(new Set(alternatives.map((a) => a.trim()).filter(Boolean)));
       let html = `He oído <span class="heard-text">${escapeHTML(alternatives[0])}</span> en lugar de <span class="heard-text">${escapeHTML(target)}</span>. Inténtalo otra vez.`;
-      if (newAttempts >= 3) {
-        html += '<br><small style="opacity:0.8">Pulsa "Despacio" para oírla de nuevo y fíjate en la posición de la boca.</small>';
+      if (uniqueAlts.length > 1) {
+        html += `<br><small style="opacity:0.7">otras: ${escapeHTML(uniqueAlts.slice(1).join(', '))}</small>`;
       }
       setFeedback({ html, type: 'error' });
-      setTimeout(() => {
-        playRecording(() => {
-          setTimeout(() => speak(target, newAttempts >= 3, voiceLang), 250);
-        });
-      }, 700);
     }
+
+    setTimeout(() => {
+      playRecording(() => {
+        if (matched) {
+          setTimeout(() => setWordIdx((i) => i + 1), 600);
+        }
+      });
+    }, 500);
   }
 
   function startRecording() {
@@ -365,27 +369,12 @@ export default function PracticeScreen({
     }
   }
 
-  function toggleRecord() {
-    if (isRecording) {
-      if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch {}
-      }
-    } else {
-      startRecording();
-    }
-  }
-
   function handleCardClick() {
     if (swipedRef.current) { swipedRef.current = false; return; }
-    if (!word) return;
-    speak(word.word, false, voiceLang);
-  }
-
-  function skip() {
-    if (recognitionRef.current && isRecording) {
-      try { recognitionRef.current.abort(); } catch {}
-    }
-    setWordIdx((i) => i + 1);
+    if (!word || isRecording) return;
+    speak(word.word, false, voiceLang, () => {
+      setTimeout(() => startRecording(), 200);
+    });
   }
 
   function back() {
@@ -415,7 +404,7 @@ export default function PracticeScreen({
       <div
         ref={cardRef}
         className={cardClass}
-        title="Pulsa para oír · desliza para cambiar"
+        title="Pulsa para oír y luego grabarte · desliza para cambiar"
         onClick={handleCardClick}
       >
         <div key={wordIdx} className={slideClass}>
@@ -425,32 +414,7 @@ export default function PracticeScreen({
         </div>
       </div>
 
-      <div className="controls">
-        <button className="btn" onClick={() => speak(word.word, false, voiceLang)}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0014 8.04v7.92A4.5 4.5 0 0016.5 12z" />
-          </svg>
-          Escuchar
-        </button>
-        <button className="btn" onClick={() => speak(word.word, true, voiceLang)}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M3 9v6h4l5 5V4L7 9H3z" />
-          </svg>
-          Despacio
-        </button>
-        <button className={`btn primary${isRecording ? ' recording' : ''}`} onClick={toggleRecord}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 14a3 3 0 003-3V5a3 3 0 00-6 0v6a3 3 0 003 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
-          </svg>
-          <span>{isRecording ? 'Escuchando…' : 'Grabar'}</span>
-        </button>
-      </div>
-
       <div className={fbClass} dangerouslySetInnerHTML={feedback ? { __html: feedback.html } : undefined} />
-
-      <div className="skip-row">
-        <button onClick={skip}>Saltar palabra</button>
-      </div>
     </div>
   );
 }
