@@ -257,6 +257,10 @@ export default function PracticeScreen({
       evaluatePronunciation(alts);
     };
 
+    rec.onnomatch = () => {
+      setFeedback({ html: 'No he reconocido nada. Inténtalo otra vez.', type: 'info' });
+    };
+
     rec.onerror = (event) => {
       if (event.error === 'no-speech') {
         setFeedback({ html: 'No te he oído. Inténtalo otra vez.', type: 'info' });
