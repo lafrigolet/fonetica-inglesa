@@ -14,7 +14,7 @@ export default function PracticeScreen({
   const [attempts, setAttempts] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [feedback, setFeedback] = useState(null); // { html, type }
-  const [cardState, setCardState] = useState(''); // '', 'success', 'error', 'listening'
+  const [cardState, setCardState] = useState(''); // '' (blue), 'recording' (red), 'success' (green)
   const [direction, setDirection] = useState('forward');
 
   const recognitionRef = useRef(null);
@@ -22,10 +22,6 @@ export default function PracticeScreen({
   const swipedRef = useRef(false);
   const prevIdxRef = useRef(initialIdx);
   const mediaStreamRef = useRef(null);
-  const mediaRecorderRef = useRef(null);
-  const recordedChunksRef = useRef([]);
-  const lastRecordingURLRef = useRef(null);
-  const activeAudioRef = useRef(null);
   const audioContextRef = useRef(null);
   const analyserNodeRef = useRef(null);
   const vadRafRef = useRef(null);
@@ -101,58 +97,10 @@ export default function PracticeScreen({
       cancelAnimationFrame(vadRafRef.current);
       vadRafRef.current = null;
     }
-    if (activeAudioRef.current) {
-      try { activeAudioRef.current.pause(); activeAudioRef.current.src = ''; } catch {}
-      activeAudioRef.current = null;
-    }
     if (recognitionRef.current) {
       try { recognitionRef.current.abort(); } catch {}
     }
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      try { mediaRecorderRef.current.stop(); } catch {}
-    }
-    if (lastRecordingURLRef.current) {
-      URL.revokeObjectURL(lastRecordingURLRef.current);
-      lastRecordingURLRef.current = null;
-    }
   }, []);
-
-  function startMediaRecording() {
-    const stream = mediaStreamRef.current;
-    if (!stream) return;
-    try {
-      recordedChunksRef.current = [];
-      const mr = new MediaRecorder(stream);
-      mr.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) recordedChunksRef.current.push(e.data);
-      };
-      mr.onstop = () => {
-        if (recordedChunksRef.current.length === 0) return;
-        if (lastRecordingURLRef.current) URL.revokeObjectURL(lastRecordingURLRef.current);
-        const blob = new Blob(recordedChunksRef.current, { type: mr.mimeType || 'audio/webm' });
-        lastRecordingURLRef.current = URL.createObjectURL(blob);
-      };
-      mr.start(100);
-      mediaRecorderRef.current = mr;
-    } catch {
-      mediaRecorderRef.current = null;
-    }
-  }
-
-  function stopMediaRecording() {
-    const mr = mediaRecorderRef.current;
-    if (mr && mr.state === 'recording') {
-      try { mr.stop(); } catch {}
-    }
-  }
-
-  function stopPlayback() {
-    const a = activeAudioRef.current;
-    if (a) {
-      try { a.pause(); a.src = ''; } catch {}
-      activeAudioRef.current = null;
-    }
-  }
 
   function startVAD() {
     const analyser = analyserNodeRef.current;
@@ -205,24 +153,6 @@ export default function PracticeScreen({
       cancelAnimationFrame(vadRafRef.current);
       vadRafRef.current = null;
     }
-  }
-
-  function playRecording(onDone) {
-    const url = lastRecordingURLRef.current;
-    if (!url) { onDone(); return; }
-    stopPlayback();
-    const audio = new Audio(url);
-    activeAudioRef.current = audio;
-    let called = false;
-    const fire = () => {
-      if (called) return;
-      called = true;
-      if (activeAudioRef.current === audio) activeAudioRef.current = null;
-      onDone();
-    };
-    audio.onended = fire;
-    audio.onerror = fire;
-    audio.play().catch(fire);
   }
 
   // Swipe handling
@@ -291,9 +221,9 @@ export default function PracticeScreen({
         type: 'success',
       });
       onMarkWordDone(phoneme.id, wordIdx);
+      setTimeout(() => setWordIdx((i) => i + 1), 1000);
     } else {
-      setCardState('error');
-      setTimeout(() => setCardState((s) => (s === 'error' ? '' : s)), 1500);
+      setCardState('');
       const uniqueAlts = Array.from(new Set(alternatives.map((a) => a.trim()).filter(Boolean)));
       let html = `He oído <span class="heard-text">${escapeHTML(alternatives[0])}</span> en lugar de <span class="heard-text">${escapeHTML(target)}</span>. Inténtalo otra vez.`;
       if (uniqueAlts.length > 1) {
@@ -301,14 +231,6 @@ export default function PracticeScreen({
       }
       setFeedback({ html, type: 'error' });
     }
-
-    setTimeout(() => {
-      playRecording(() => {
-        if (matched) {
-          setTimeout(() => setWordIdx((i) => i + 1), 600);
-        }
-      });
-    }, 500);
   }
 
   function startRecording() {
@@ -325,7 +247,7 @@ export default function PracticeScreen({
     rec.maxAlternatives = 5;
 
     setIsRecording(true);
-    setCardState('listening');
+    setCardState('recording');
     setFeedback(null);
 
     rec.onresult = (event) => {
@@ -338,7 +260,6 @@ export default function PracticeScreen({
     rec.onerror = (event) => {
       if (event.error === 'no-speech') {
         setFeedback({ html: 'No te he oído. Inténtalo otra vez.', type: 'info' });
-        setTimeout(() => speak(word.word, false, voiceLang), 700);
       } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
         setFeedback({ html: 'Necesito permiso para usar el micrófono.', type: 'error' });
       } else if (event.error !== 'aborted') {
@@ -348,19 +269,16 @@ export default function PracticeScreen({
 
     rec.onend = () => {
       setIsRecording(false);
-      setCardState((s) => (s === 'listening' ? '' : s));
+      setCardState((s) => (s === 'recording' ? '' : s));
       recognitionRef.current = null;
-      stopMediaRecording();
       stopVAD();
     };
 
-    stopPlayback();
     stopVAD();
 
     recognitionRef.current = rec;
     try {
       rec.start();
-      startMediaRecording();
       startVAD();
     } catch {
       setIsRecording(false);
@@ -386,7 +304,7 @@ export default function PracticeScreen({
 
   if (!word) return null;
 
-  const cardClass = ['word-card', cardState].filter(Boolean).join(' ');
+  const buttonClass = ['record-button', cardState].filter(Boolean).join(' ');
   const fbClass = feedback ? `feedback show ${feedback.type}` : 'feedback';
   const slideClass = direction === 'backward' ? 'animate-slide-in-left' : 'animate-slide-in-right';
 
@@ -401,17 +319,19 @@ export default function PracticeScreen({
         <div className="practice-progress">{wordIdx + 1} / {phoneme.words.length}</div>
       </div>
 
-      <div
+      <button
         ref={cardRef}
-        className={cardClass}
+        type="button"
+        className={buttonClass}
         title="Pulsa para oír y luego grabarte · desliza para cambiar"
         onClick={handleCardClick}
       >
-        <div key={wordIdx} className={slideClass}>
-          <div className="word-ipa">{word.ipa}</div>
-          <div className="word-text">{word.word}</div>
-          <div className="word-meaning">{word.meaning}</div>
-        </div>
+        <span key={wordIdx} className={`record-button-label ${slideClass}`}>{word.word}</span>
+      </button>
+
+      <div className="word-meta" key={`meta-${wordIdx}`}>
+        <div className="word-ipa">{word.ipa}</div>
+        <div className="word-meaning">{word.meaning}</div>
       </div>
 
       <div className={fbClass} dangerouslySetInnerHTML={feedback ? { __html: feedback.html } : undefined} />
