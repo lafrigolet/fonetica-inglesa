@@ -25,6 +25,12 @@ export default function PracticeScreen({
   const audioContextRef = useRef(null);
   const analyserNodeRef = useRef(null);
   const vadRafRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const recordedChunksRef = useRef([]);
+  const lastRecordingURLRef = useRef(null);
+  const activeAudioRef = useRef(null);
+  const pendingPlaybackRef = useRef(false);
+  const handledRef = useRef(false);
 
   // Reset on phoneme change
   useEffect(() => {
@@ -97,10 +103,77 @@ export default function PracticeScreen({
       cancelAnimationFrame(vadRafRef.current);
       vadRafRef.current = null;
     }
+    if (activeAudioRef.current) {
+      try { activeAudioRef.current.pause(); activeAudioRef.current.src = ''; } catch {}
+      activeAudioRef.current = null;
+    }
     if (recognitionRef.current) {
       try { recognitionRef.current.abort(); } catch {}
     }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      try { mediaRecorderRef.current.stop(); } catch {}
+    }
+    if (lastRecordingURLRef.current) {
+      URL.revokeObjectURL(lastRecordingURLRef.current);
+      lastRecordingURLRef.current = null;
+    }
   }, []);
+
+  function startMediaRecording() {
+    const stream = mediaStreamRef.current;
+    if (!stream) return;
+    try {
+      recordedChunksRef.current = [];
+      const mr = new MediaRecorder(stream);
+      mr.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) recordedChunksRef.current.push(e.data);
+      };
+      mr.onstop = () => {
+        if (recordedChunksRef.current.length > 0) {
+          if (lastRecordingURLRef.current) URL.revokeObjectURL(lastRecordingURLRef.current);
+          const blob = new Blob(recordedChunksRef.current, { type: mr.mimeType || 'audio/webm' });
+          lastRecordingURLRef.current = URL.createObjectURL(blob);
+        }
+        if (pendingPlaybackRef.current) {
+          pendingPlaybackRef.current = false;
+          playRecording();
+        }
+      };
+      mr.start(100);
+      mediaRecorderRef.current = mr;
+    } catch {
+      mediaRecorderRef.current = null;
+    }
+  }
+
+  function stopMediaRecording() {
+    const mr = mediaRecorderRef.current;
+    if (mr && mr.state === 'recording') {
+      try { mr.stop(); } catch {}
+    }
+  }
+
+  function stopPlayback() {
+    const a = activeAudioRef.current;
+    if (a) {
+      try { a.pause(); a.src = ''; } catch {}
+      activeAudioRef.current = null;
+    }
+  }
+
+  function playRecording() {
+    const url = lastRecordingURLRef.current;
+    if (!url) return;
+    stopPlayback();
+    const audio = new Audio(url);
+    activeAudioRef.current = audio;
+    const clear = () => {
+      if (activeAudioRef.current === audio) activeAudioRef.current = null;
+    };
+    audio.onended = clear;
+    audio.onerror = clear;
+    audio.play().catch(clear);
+  }
 
   function startVAD() {
     const analyser = analyserNodeRef.current;
@@ -207,11 +280,11 @@ export default function PracticeScreen({
     if (!word) return;
     const target = word.word;
     console.log('[Ship o Sheep] reconocido:', alternatives, '· objetivo:', target);
-    const matched = alternatives.length > 0 && isMatch(target, alternatives[0]);
-    const newAttempts = attempts + 1;
-    setAttempts(newAttempts);
+    const matched = alternatives.some((alt) => isMatch(target, alt));
+    setAttempts((a) => a + 1);
 
     if (matched) {
+      handledRef.current = true;
       setCardState('success');
       setFeedback({
         html: `¡Correcto! Has dicho <span class="heard-text">${escapeHTML(alternatives[0])}</span>`,
@@ -219,14 +292,6 @@ export default function PracticeScreen({
       });
       onMarkWordDone(phoneme.id, wordIdx);
       setTimeout(() => setWordIdx((i) => i + 1), 1000);
-    } else {
-      setCardState('');
-      const uniqueAlts = Array.from(new Set(alternatives.map((a) => a.trim()).filter(Boolean)));
-      let html = `He oído <span class="heard-text">${escapeHTML(alternatives[0])}</span> en lugar de <span class="heard-text">${escapeHTML(target)}</span>. Inténtalo otra vez.`;
-      if (uniqueAlts.length > 1) {
-        html += `<br><small style="opacity:0.7">otras: ${escapeHTML(uniqueAlts.slice(1).join(', '))}</small>`;
-      }
-      setFeedback({ html, type: 'error' });
     }
   }
 
@@ -247,39 +312,69 @@ export default function PracticeScreen({
     setCardState('recording');
     setFeedback(null);
 
+    rec.onstart = () => { console.log('[SR] onstart'); };
+    rec.onaudiostart = () => { console.log('[SR] onaudiostart'); };
+    rec.onsoundstart = () => { console.log('[SR] onsoundstart'); };
+    rec.onspeechstart = () => { console.log('[SR] onspeechstart'); };
+    rec.onspeechend = () => { console.log('[SR] onspeechend'); };
+    rec.onsoundend = () => { console.log('[SR] onsoundend'); };
+    rec.onaudioend = () => { console.log('[SR] onaudioend'); };
+
     rec.onresult = (event) => {
+      console.log('[SR] onresult', event);
       const results = event.results[0];
       const alts = [];
       for (let i = 0; i < results.length; i++) alts.push(results[i].transcript);
       evaluatePronunciation(alts);
     };
 
-    rec.onnomatch = () => {
-      setFeedback({ html: 'No he reconocido nada. Inténtalo otra vez.', type: 'info' });
+    rec.onnomatch = (event) => {
+      console.log('[SR] onnomatch', event);
     };
 
     rec.onerror = (event) => {
-      if (event.error === 'no-speech') {
-        setFeedback({ html: 'No te he oído. Inténtalo otra vez.', type: 'info' });
-      } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+      console.log('[SR] onerror', event.error, event);
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        handledRef.current = true;
         setFeedback({ html: 'Necesito permiso para usar el micrófono.', type: 'error' });
-      } else if (event.error !== 'aborted') {
+      } else if (event.error === 'aborted') {
+        handledRef.current = true;
+      } else if (event.error !== 'no-speech') {
+        handledRef.current = true;
         setFeedback({ html: 'Error de reconocimiento: ' + event.error, type: 'error' });
       }
     };
 
     rec.onend = () => {
+      console.log('[SR] onend');
       setIsRecording(false);
       setCardState((s) => (s === 'recording' ? '' : s));
       recognitionRef.current = null;
       stopVAD();
+
+      if (!handledRef.current) {
+        setFeedback({ html: 'No se ha reconocido, intenta otra vez.', type: 'error' });
+        pendingPlaybackRef.current = true;
+      }
+
+      stopMediaRecording();
+
+      const mr = mediaRecorderRef.current;
+      if (pendingPlaybackRef.current && (!mr || mr.state === 'inactive')) {
+        pendingPlaybackRef.current = false;
+        playRecording();
+      }
     };
 
     stopVAD();
+    stopPlayback();
+    pendingPlaybackRef.current = false;
+    handledRef.current = false;
 
     recognitionRef.current = rec;
     try {
       rec.start();
+      startMediaRecording();
       startVAD();
     } catch {
       setIsRecording(false);
