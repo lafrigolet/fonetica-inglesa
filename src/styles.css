@@ -159,6 +159,7 @@ header p { color: var(--text-muted); font-size: 15px; }
 
 .record-button {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   width: 220px;
@@ -197,6 +198,27 @@ header p { color: var(--text-muted); font-size: 15px; }
   display: inline-block;
   padding: 0 16px;
   word-break: break-word;
+}
+.record-button-counter {
+  font-size: 30px;
+  font-weight: 600;
+  color: white;
+  opacity: 0.9;
+  margin-top: 8px;
+  letter-spacing: 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.record-button-counter-num {
+  display: inline-block;
+  min-width: 1.2em;
+  text-align: center;
+  animation: counter-roll-up 1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes counter-roll-up {
+  0%   { transform: translateY(60%); opacity: 0; }
+  100% { transform: translateY(0);   opacity: 1; }
 }
 
 .word-meta { text-align: center; margin-bottom: 8px; }

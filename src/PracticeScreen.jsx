@@ -10,8 +10,11 @@ export default function PracticeScreen({
   onBack,
   onComplete,
 }) {
+  const TARGET_REPETITIONS = 10;
+
   const [wordIdx, setWordIdx] = useState(initialIdx);
   const [attempts, setAttempts] = useState(0);
+  const [successCount, setSuccessCount] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [feedback, setFeedback] = useState(null); // { html, type }
   const [cardState, setCardState] = useState(''); // '' (blue), 'recording' (red), 'success' (green)
@@ -43,6 +46,7 @@ export default function PracticeScreen({
     else if (wordIdx < prevIdxRef.current) setDirection('backward');
     prevIdxRef.current = wordIdx;
     setAttempts(0);
+    setSuccessCount(0);
     setFeedback(null);
     setCardState('');
   }, [wordIdx]);
@@ -285,13 +289,27 @@ export default function PracticeScreen({
 
     if (matched) {
       handledRef.current = true;
+      const newCount = successCount + 1;
+      setSuccessCount(newCount);
       setCardState('success');
-      setFeedback({
-        html: `¡Correcto! Has dicho <span class="heard-text">${escapeHTML(alternatives[0])}</span>`,
-        type: 'success',
-      });
-      onMarkWordDone(phoneme.id, wordIdx);
-      setTimeout(() => setWordIdx((i) => i + 1), 1000);
+      const heard = `<span class="heard-text">${escapeHTML(alternatives[0])}</span>`;
+      if (newCount >= TARGET_REPETITIONS) {
+        setFeedback({
+          html: `¡Lo dominas! ${TARGET_REPETITIONS}/${TARGET_REPETITIONS} - Has dicho ${heard}.`,
+          type: 'success',
+        });
+        onMarkWordDone(phoneme.id, wordIdx);
+        setTimeout(() => setWordIdx((i) => i + 1), 1200);
+      } else {
+        const remaining = TARGET_REPETITIONS - newCount;
+        const veces = remaining === 1 ? 'vez' : 'veces';
+        const queda = remaining === 1 ? 'queda' : 'quedan';
+        setFeedback({
+          html: `¡Enhorabuena! ${newCount}/${TARGET_REPETITIONS} - Te ${queda} ${remaining} ${veces}. ¡Repítelo!`,
+          type: 'success',
+        });
+        setTimeout(() => setCardState((s) => (s === 'success' ? '' : s)), 1000);
+      }
     }
   }
 
@@ -357,10 +375,13 @@ export default function PracticeScreen({
         pendingPlaybackRef.current = true;
       }
 
-      stopMediaRecording();
-
       const mr = mediaRecorderRef.current;
-      if (pendingPlaybackRef.current && (!mr || mr.state === 'inactive')) {
+      const wasRecording = mr && mr.state === 'recording';
+      if (wasRecording) {
+        // mr.onstop will fire async, set the URL and trigger the playback.
+        stopMediaRecording();
+      } else if (pendingPlaybackRef.current) {
+        // No live recorder — play whatever URL we have right now (may be empty).
         pendingPlaybackRef.current = false;
         playRecording();
       }
@@ -415,6 +436,8 @@ export default function PracticeScreen({
         <div className="practice-progress">{wordIdx + 1} / {phoneme.words.length}</div>
       </div>
 
+      <div className={fbClass} dangerouslySetInnerHTML={feedback ? { __html: feedback.html } : undefined} />
+
       <button
         ref={cardRef}
         type="button"
@@ -423,6 +446,11 @@ export default function PracticeScreen({
         onClick={handleCardClick}
       >
         <span key={wordIdx} className={`record-button-label ${slideClass}`}>{word.word}</span>
+        <span className="record-button-counter">
+          <span key={successCount} className="record-button-counter-num">
+            {Math.max(0, TARGET_REPETITIONS - successCount)}
+          </span>
+        </span>
       </button>
 
       <div className="word-meta" key={`meta-${wordIdx}`}>
@@ -430,7 +458,6 @@ export default function PracticeScreen({
         <div className="word-meaning">{word.meaning}</div>
       </div>
 
-      <div className={fbClass} dangerouslySetInnerHTML={feedback ? { __html: feedback.html } : undefined} />
     </div>
   );
 }
