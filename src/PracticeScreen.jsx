@@ -207,10 +207,7 @@ export default function PracticeScreen({
     if (!word) return;
     const target = word.word;
     console.log('[Ship o Sheep] reconocido:', alternatives, '· objetivo:', target);
-    let matched = false;
-    for (const alt of alternatives) {
-      if (isMatch(target, alt)) { matched = true; break; }
-    }
+    const matched = alternatives.length > 0 && isMatch(target, alternatives[0]);
     const newAttempts = attempts + 1;
     setAttempts(newAttempts);
 
