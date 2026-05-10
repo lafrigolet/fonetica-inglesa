@@ -324,15 +324,7 @@ export default function PracticeScreen({
     setCardState('listening');
     setFeedback(null);
 
-    rec.onstart = () => { stopPlayback(); };
-    rec.onaudiostart = () => { stopPlayback(); };
-    rec.onspeechstart = () => { stopPlayback(); };
-    rec.onspeechend = () => { stopMediaRecording(); stopPlayback(); };
-    rec.onaudioend = () => { stopMediaRecording(); stopPlayback(); };
-
     rec.onresult = (event) => {
-      stopMediaRecording();
-      stopPlayback();
       const results = event.results[0];
       const alts = [];
       for (let i = 0; i < results.length; i++) alts.push(results[i].transcript);
@@ -340,8 +332,6 @@ export default function PracticeScreen({
     };
 
     rec.onerror = (event) => {
-      stopMediaRecording();
-      stopPlayback();
       if (event.error === 'no-speech') {
         setFeedback({ html: 'No te he oído. Inténtalo otra vez.', type: 'info' });
         setTimeout(() => speak(word.word, false, voiceLang), 700);
