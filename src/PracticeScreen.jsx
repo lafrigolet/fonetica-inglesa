@@ -369,6 +369,16 @@ export default function PracticeScreen({
         });
         setTimeout(() => setCardState((s) => (s === 'success' ? '' : s)), 1000);
       }
+    } else {
+      handledRef.current = true;
+      const uniqueAlts = Array.from(new Set(alternatives.map((a) => a.trim()).filter(Boolean)));
+      const heard = uniqueAlts[0] || alternatives[0] || '';
+      let html = `He oído <span class="heard-text">${escapeHTML(heard)}</span> en lugar de <span class="heard-text">${escapeHTML(target)}</span>. Inténtalo otra vez.`;
+      if (uniqueAlts.length > 1) {
+        html += `<br><small style="opacity:0.7">otras: ${escapeHTML(uniqueAlts.slice(1).join(', '))}</small>`;
+      }
+      setFeedback({ html, type: 'error' });
+      pendingPlaybackRef.current = true;
     }
   }
 
