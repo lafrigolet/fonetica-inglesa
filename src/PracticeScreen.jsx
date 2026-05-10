@@ -490,7 +490,9 @@ export default function PracticeScreen({
         <div className="practice-progress">{wordIdx + 1} / {words.length}</div>
       </div>
 
-      <div className={fbClass} dangerouslySetInnerHTML={feedback ? { __html: feedback.html } : undefined} />
+      <div className="feedback-slot">
+        <div className={fbClass} dangerouslySetInnerHTML={feedback ? { __html: feedback.html } : undefined} />
+      </div>
 
       <div className="word-carousel" ref={carouselRef}>
         <div
