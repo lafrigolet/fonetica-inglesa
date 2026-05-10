@@ -64,7 +64,16 @@ export default function PracticeScreen({
 
   // Pre-acquire mic stream once when entering the practice screen so the
   // browser only renegotiates audio routing once instead of on every press.
+  // On mobile (coarse pointer + no hover) we skip this entirely: the engine's
+  // own audio pipeline can't share the mic with our getUserMedia stream and
+  // ends up receiving silence (visible as audiostart→audioend with no
+  // soundstart/speechstart). VAD and recording playback are unavailable
+  // there as a result, but the recognizer itself works.
   useEffect(() => {
+    const isMobileLike = typeof window !== 'undefined' &&
+      window.matchMedia('(pointer: coarse) and (hover: none)').matches;
+    if (isMobileLike) return;
+
     let cancelled = false;
     (async () => {
       if (!navigator.mediaDevices || typeof window.MediaRecorder === 'undefined') return;
