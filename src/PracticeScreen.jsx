@@ -26,6 +26,9 @@ export default function PracticeScreen({
   const recordedChunksRef = useRef([]);
   const lastRecordingURLRef = useRef(null);
   const activeAudioRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const analyserNodeRef = useRef(null);
+  const vadRafRef = useRef(null);
 
   // Reset on phoneme change
   useEffect(() => {
@@ -63,10 +66,28 @@ export default function PracticeScreen({
           return;
         }
         mediaStreamRef.current = stream;
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (Ctx) {
+          try {
+            const ctx = new Ctx();
+            const src = ctx.createMediaStreamSource(stream);
+            const an = ctx.createAnalyser();
+            an.fftSize = 1024;
+            an.smoothingTimeConstant = 0.5;
+            src.connect(an);
+            audioContextRef.current = ctx;
+            analyserNodeRef.current = an;
+          } catch {}
+        }
       } catch {}
     })();
     return () => {
       cancelled = true;
+      if (audioContextRef.current) {
+        try { audioContextRef.current.close(); } catch {}
+        audioContextRef.current = null;
+        analyserNodeRef.current = null;
+      }
       if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach((t) => t.stop());
         mediaStreamRef.current = null;
@@ -76,6 +97,10 @@ export default function PracticeScreen({
 
   // Cleanup on unmount
   useEffect(() => () => {
+    if (vadRafRef.current) {
+      cancelAnimationFrame(vadRafRef.current);
+      vadRafRef.current = null;
+    }
     if (activeAudioRef.current) {
       try { activeAudioRef.current.pause(); activeAudioRef.current.src = ''; } catch {}
       activeAudioRef.current = null;
@@ -126,6 +151,59 @@ export default function PracticeScreen({
     if (a) {
       try { a.pause(); a.src = ''; } catch {}
       activeAudioRef.current = null;
+    }
+  }
+
+  function startVAD() {
+    const analyser = analyserNodeRef.current;
+    const ctx = audioContextRef.current;
+    if (!analyser) return;
+    if (ctx && ctx.state === 'suspended') {
+      try { ctx.resume(); } catch {}
+    }
+    const buf = new Uint8Array(analyser.fftSize);
+    const SILENCE_RMS = 0.02;
+    const SILENCE_HOLD_MS = 700;
+    const MAX_SESSION_MS = 6000;
+    const sessionStart = performance.now();
+    let speechStarted = false;
+    let silenceStart = null;
+    const tick = () => {
+      vadRafRef.current = null;
+      if (!analyserNodeRef.current) return;
+      const rec = recognitionRef.current;
+      if (!rec) return;
+      analyser.getByteTimeDomainData(buf);
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) {
+        const v = (buf[i] - 128) / 128;
+        sum += v * v;
+      }
+      const rms = Math.sqrt(sum / buf.length);
+      const now = performance.now();
+      if (rms > SILENCE_RMS) {
+        speechStarted = true;
+        silenceStart = null;
+      } else if (speechStarted) {
+        if (silenceStart === null) silenceStart = now;
+        if (now - silenceStart > SILENCE_HOLD_MS) {
+          try { rec.stop(); } catch {}
+          return;
+        }
+      }
+      if (now - sessionStart > MAX_SESSION_MS) {
+        try { rec.stop(); } catch {}
+        return;
+      }
+      vadRafRef.current = requestAnimationFrame(tick);
+    };
+    vadRafRef.current = requestAnimationFrame(tick);
+  }
+
+  function stopVAD() {
+    if (vadRafRef.current) {
+      cancelAnimationFrame(vadRafRef.current);
+      vadRafRef.current = null;
     }
   }
 
@@ -279,14 +357,17 @@ export default function PracticeScreen({
       setCardState((s) => (s === 'listening' ? '' : s));
       recognitionRef.current = null;
       stopMediaRecording();
+      stopVAD();
     };
 
     stopPlayback();
+    stopVAD();
 
     recognitionRef.current = rec;
     try {
       rec.start();
       startMediaRecording();
+      startVAD();
     } catch {
       setIsRecording(false);
       setCardState('');
