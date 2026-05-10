@@ -334,6 +334,9 @@ export default function PracticeScreen({
     if (recognitionRef.current && isRecording) {
       try { recognitionRef.current.abort(); } catch {}
     }
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try { navigator.vibrate(10); } catch {}
+    }
     setWordIdx(target);
   }
 
@@ -476,6 +479,9 @@ export default function PracticeScreen({
   function handleCardClick() {
     if (swipedRef.current) { swipedRef.current = false; return; }
     if (!word || isRecording) return;
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try { navigator.vibrate(20); } catch {}
+    }
     speak(word.word, false, voiceLang, () => {
       setTimeout(() => startRecording(), 200);
     });
